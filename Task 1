@@ -1,4 +1,4 @@
-// Insert to the database with java programming:
+
 try { 
    String sql = "INSERT INTO table_name (column1, column2, column3) VALUES (2, 3, 4)"; 
    PreparedStatement statement = con.prepareStatement(sql); 
