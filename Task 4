@@ -1,26 +1,86 @@
 import java.rmi.*;
-
+import java.rmi.registry.*;
 import java.rmi.server.*;
-import java.sql.*;
-import java.util.Vector;
-public class OrderServerImpl
-    extends UnicastRemoteObject
-    implements OrderServer
-{
-    Connection db;                  
-    
-PreparedStatement unpaidQuery;      
-OrderServerImpl() throws RemoteException, SQLException {
-        db = DriverManager.getConnection("jdbc:odbc:orders");
-        unpaidQuery = db.prepareStatement("...");
-    }
-    public Vector getUnpaid() throws SQLException {
-        ResultSet results = unpaidQuery.executeQuery();
-        Vector list = new Vector();
-        while (results.next())
-            list.addElement(new Order(results));
-        return list;
-    }
-    public native void shutDown();
-}
+import java.util.*;
+ class NodeRMI {
 
+    // Remote Interface
+    public interface Node extends Remote {
+        void registerNode(String nodeName) throws RemoteException;
+        List<String> getRegisteredNodes() throws RemoteException;
+    }
+
+    // Implementation of the Remote Interface
+    public static class NodeImpl extends UnicastRemoteObject implements Node {
+        private List<String> registeredNodes;
+
+        protected NodeImpl() throws RemoteException {
+            registeredNodes = new ArrayList<>();
+        }
+
+        @Override
+        public synchronized void registerNode(String nodeName) throws RemoteException {
+            if (!registeredNodes.contains(nodeName)) {
+                registeredNodes.add(nodeName);
+                System.out.println(nodeName + " registered successfully.");
+            }
+        }
+
+        @Override
+        public synchronized List<String> getRegisteredNodes() throws RemoteException {
+            return new ArrayList<>(registeredNodes);
+        }
+    }
+
+    // Server
+    public static void startServer() {
+        try {
+            // Create and export the registry on port 1099
+            LocateRegistry.createRegistry(1099);
+
+            // Create an instance of the remote object
+            Node node = new NodeImpl();
+
+            // Bind the remote object's stub in the registry
+            Naming.rebind("Node", node);
+
+            System.out.println("Node Server is running...");
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    // Client
+    public static void startClient() {
+        try {
+            // Lookup the remote object from the registry
+            Node node = (Node) Naming.lookup("//localhost/Node");
+
+            // Register nodes
+            node.registerNode("Node1");
+            node.registerNode("Node2");
+
+            // Retrieve and print the list of registered nodes
+            List<String> nodes = node.getRegisteredNodes();
+            System.out.println("Registered nodes: " + nodes);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    // Main Method
+    public static void main(String[] args) {
+        // Start the server in a separate thread
+        new Thread(() -> startServer()).start();
+
+        // Wait for a moment to let the server start
+        try {
+            Thread.sleep(2000);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+
+        // Start the client
+        startClient();
+    }
+}
